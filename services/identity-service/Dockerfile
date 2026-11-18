@@ -4,7 +4,11 @@ FROM node:22-alpine
 ENV NODE_ENV=production
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci --omit=dev && npm cache clean --force
+RUN npm ci --omit=dev && npm cache clean --force \
+  # The service runs with plain `node`; package managers stay out of the
+  # runtime image (smaller attack surface, no CVEs from npm's own deps).
+  && rm -rf /usr/local/lib/node_modules /usr/local/bin/npm /usr/local/bin/npx \
+     /usr/local/bin/corepack /opt/yarn-* /usr/local/bin/yarn /usr/local/bin/yarnpkg
 COPY src ./src
 
 # The official image ships an unprivileged "node" user.
