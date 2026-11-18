@@ -6,7 +6,7 @@ part of 'app_router.dart';
 // RiverpodGenerator
 // **************************************************************************
 
-String _$appRouterHash() => r'cc3045bf313989c20dcd2e1cc6401079bb106355';
+String _$appRouterHash() => r'c10f0d7c4166b88815653a364dd97d631493d712';
 
 /// Routes and their auth guards. [_redirect] is the only place that decides
 /// where the auth state sends the user; `refreshListenable` re-runs it on
