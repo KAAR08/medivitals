@@ -51,7 +51,7 @@ jobs:
       - name: Build release APK (mock backend)
         run: flutter build apk --release
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: medvitals-link-apk
           path: build/app/outputs/flutter-apk/app-release.apk
