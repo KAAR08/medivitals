@@ -1,0 +1,10 @@
+# Normalize line endings in the repo; Linux CI needs LF for shell scripts.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+*.png binary
+*.jpg binary
+*.jar binary
+*.pptx binary
+*.apk binary
