@@ -1,0 +1,24 @@
+name: Security
+
+on:
+  push:
+    branches: ['**'] # every branch: feature branches are tested before their pull request
+  pull_request:
+  schedule:
+    - cron: '0 5 * * 1' # weekly, to catch newly published vulnerabilities
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Secret scanning (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # scan the full history, not just the last commit
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

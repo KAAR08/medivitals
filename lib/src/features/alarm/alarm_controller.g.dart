@@ -20,7 +20,7 @@ final alarmPlayerProvider = Provider<AlarmPlayer>.internal(
 );
 
 typedef AlarmPlayerRef = ProviderRef<AlarmPlayer>;
-String _$alarmControllerHash() => r'43f0f139ba970d9137cfe401d7505e395897f9bf';
+String _$alarmControllerHash() => r'832ad6743c8cc4a04cc52f69e39667dcebbb1d5a';
 
 /// The care team's audible alarm for critical patients. Patients get no
 /// siren (alarming a recovering cardiac patient does harm): their app plays
