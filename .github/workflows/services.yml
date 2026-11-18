@@ -54,7 +54,7 @@ jobs:
         run: docker build -t medvitals/${{ matrix.service }}:ci .
 
       - name: Scan image (Trivy)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0, pinned to a commit
         with:
           image-ref: medvitals/${{ matrix.service }}:ci
           severity: CRITICAL,HIGH
@@ -92,7 +92,7 @@ jobs:
         run: docker build -t medvitals/identity-service:ci .
 
       - name: Scan image (Trivy)
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0, pinned to a commit
         with:
           image-ref: medvitals/identity-service:ci
           severity: CRITICAL,HIGH
