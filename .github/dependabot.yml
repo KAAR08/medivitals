@@ -1,27 +1,64 @@
+# Dependency updates: one grouped pull request per ecosystem per month,
+# never major versions (those need deliberate migration work).
 version: 2
 updates:
   - package-ecosystem: pub
     directory: /
     schedule:
-      interval: weekly
-    open-pull-requests-limit: 5
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      flutter-packages:
+        patterns: ['*']
+    ignore:
+      # Newer minor releases often need a newer Dart than the pinned Flutter 3.22.3.
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
+      # Pinned: 1.x needs a newer Flutter engine (see pubspec.yaml).
+      - dependency-name: flutter_webrtc
 
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      actions:
+        patterns: ['*']
 
   - package-ecosystem: pip
     directories: ['/services/telemetry-engine', '/services/biometric-simulator']
     schedule:
-      interval: weekly
-
-  - package-ecosystem: docker
-    directories: ['/services/telemetry-engine', '/services/biometric-simulator', '/services/identity-service']
-    schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      python-packages:
+        patterns: ['*']
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: npm
     directory: /services/identity-service
     schedule:
-      interval: weekly
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      node-packages:
+        patterns: ['*']
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: docker
+    directories: ['/services/telemetry-engine', '/services/biometric-simulator', '/services/identity-service']
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 1
+    groups:
+      base-images:
+        patterns: ['*']
+    ignore:
+      # Stay on the Python 3.12 / Node 22 lines the code is tested on.
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major', 'version-update:semver-minor']
