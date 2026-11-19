@@ -1,0 +1,203 @@
+# MedVitals Link: the whole system.
+#
+#   python scripts/generate_dev_secrets.py   # once: creates secrets/ and .env
+#   docker compose up -d --build
+#   https://localhost:8443/health
+#
+# The gateway (8443 locally, 443 on a server) is the only way into the
+# services. The TURN relay publishes 3478 and a small UDP range for call media.
+# Databases sit on an internal network with no route to the outside world.
+#
+# Every secret is a file in secrets/, mounted only into the services that need
+# it (under /run/secrets), never an environment variable. .env holds only
+# non-secret settings (host names, ports).
+#
+# Run the engine as a single instance: its 5-minute trend windows live in
+# memory (see services/telemetry-engine/app/trends.py).
+
+name: medvitals
+
+services:
+  gateway:
+    image: caddy:2.8-alpine
+    # Local: https://localhost:8443. Server: GATEWAY_PORT=443, GATEWAY_HTTP_PORT=80.
+    ports:
+      - "${GATEWAY_PORT:-8443}:443"
+      - "${GATEWAY_HTTP_PORT:-8080}:80"
+    environment:
+      GATEWAY_HOST: ${GATEWAY_HOST:-localhost}
+      GATEWAY_TLS_ISSUER: ${GATEWAY_TLS_ISSUER:-internal}
+    volumes:
+      - ./infra/gateway/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+    depends_on:
+      identity: { condition: service_healthy }
+      engine: { condition: service_healthy }
+    networks: [edge]
+    restart: unless-stopped
+
+  identity:
+    build: ./services/identity-service
+    environment:
+      IDENTITY_MONGO_URL: mongodb://medvitals@mongo:27017/medvitals_identity?authSource=admin
+      IDENTITY_MONGO_PASSWORD_FILE: /run/secrets/mongo_password
+      IDENTITY_JWT_PRIVATE_KEY_FILE: /run/secrets/jwt_private_key
+    secrets: [jwt_private_key, mongo_password]
+    depends_on:
+      mongo: { condition: service_healthy }
+    networks: [edge, data]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  identity-seed:
+    build: ./services/identity-service
+    command: ["node", "src/seed.js"]
+    environment:
+      IDENTITY_MONGO_URL: mongodb://medvitals@mongo:27017/medvitals_identity?authSource=admin
+      IDENTITY_MONGO_PASSWORD_FILE: /run/secrets/mongo_password
+      IDENTITY_SEED_PASSWORD_FILE: /run/secrets/seed_password
+    secrets: [mongo_password, seed_password]
+    depends_on:
+      mongo: { condition: service_healthy }
+    networks: [data]
+    restart: "no"
+
+  engine:
+    build: ./services/telemetry-engine
+    environment:
+      ENGINE_DATABASE_URL: postgresql+asyncpg://medvitals@postgres:5432/telemetry
+      ENGINE_REDIS_URL: redis://redis:6379/0
+      ENGINE_JWKS_URL: http://identity:4000/.well-known/jwks.json
+      ENGINE_ENABLE_DOCS: "false"
+      # Voice/video calls: the TURN relay below, with short-lived credentials.
+      ENGINE_STUN_URLS: '["stun:${TURN_HOST:-localhost}:3478"]'
+      ENGINE_TURN_URLS: '["turn:${TURN_HOST:-localhost}:3478?transport=udp","turn:${TURN_HOST:-localhost}:3478?transport=tcp"]'
+    # Read by name from /run/secrets (engine_database_password, ...).
+    secrets:
+      - { source: postgres_password, target: engine_database_password }
+      - { source: encryption_key, target: engine_encryption_key }
+      - { source: device_api_key, target: engine_device_api_keys }
+      - { source: turn_secret, target: engine_turn_secret }
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+      identity: { condition: service_healthy }
+    networks: [edge, data]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  simulator:
+    build: ./services/biometric-simulator
+    environment:
+      SIM_ENGINE_URL: http://engine:8000
+      SIM_DEVICE_KEY_FILE: /run/secrets/device_api_key
+      SIM_INTERVAL: "1.0"
+    secrets: [device_api_key]
+    depends_on:
+      engine: { condition: service_healthy }
+    networks: [edge]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  # TURN relay for calls, used when two devices can't connect directly (e.g.
+  # both on mobile data). It relays media it can't decrypt (DTLS-SRTP),
+  # accepts only short-lived credentials signed by the engine, and won't relay
+  # to private or loopback addresses, so it can't be used to reach the
+  # internal network.
+  turn:
+    image: coturn/coturn:4.6.2
+    secrets: [turn_secret]
+    # The shared secret is read from its file at start-up.
+    entrypoint: ["sh", "-c"]
+    command:
+      - >-
+        exec turnserver -n --log-file=stdout
+        --listening-port=3478 --min-port=49160 --max-port=49200
+        --external-ip=${TURN_EXTERNAL_IP:-127.0.0.1} --realm=medvitals
+        --use-auth-secret --static-auth-secret="$$(cat /run/secrets/turn_secret)"
+        --fingerprint --no-cli --no-tls --no-dtls --no-multicast-peers
+        --denied-peer-ip=0.0.0.0-0.255.255.255
+        --denied-peer-ip=10.0.0.0-10.255.255.255
+        --denied-peer-ip=100.64.0.0-100.127.255.255
+        --denied-peer-ip=127.0.0.0-127.255.255.255
+        --denied-peer-ip=169.254.0.0-169.254.255.255
+        --denied-peer-ip=172.16.0.0-172.31.255.255
+        --denied-peer-ip=192.168.0.0-192.168.255.255
+        --denied-peer-ip=::1
+        --denied-peer-ip=fc00::-fdff:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+        --denied-peer-ip=fe80::-febf:ffff:ffff:ffff:ffff:ffff:ffff:ffff
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "49160-49200:49160-49200/udp"
+    tmpfs: [/var/lib/coturn]
+    networks: [turn]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: medvitals
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_DB: telemetry
+    secrets: [postgres_password]
+    volumes: [postgres-data:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medvitals -d telemetry"]
+      interval: 5s
+      retries: 10
+    networks: [data]
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"] # pub/sub only, nothing to persist
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+    networks: [data]
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: medvitals
+      MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongo_password
+    secrets: [mongo_password]
+    volumes: [mongo-data:/data/db]
+    healthcheck:
+      # mongosh is a full Node.js process: probe quickly while starting,
+      # then rarely, so the health check doesn't eat the CPU.
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 30s
+      start_period: 60s
+      start_interval: 2s
+      retries: 5
+    networks: [data]
+    restart: unless-stopped
+
+networks:
+  edge: {}
+  turn: {} # the relay talks only to the internet, never to the services
+  data:
+    internal: true # no egress: databases can't reach or be reached from outside
+
+volumes:
+  postgres-data: {}
+  mongo-data: {}
+  caddy-data: {}
+
+secrets:
+  jwt_private_key: { file: ./secrets/jwt_private_key.pem }
+  postgres_password: { file: ./secrets/postgres_password }
+  mongo_password: { file: ./secrets/mongo_password }
+  encryption_key: { file: ./secrets/encryption_key }
+  device_api_key: { file: ./secrets/device_api_key }
+  turn_secret: { file: ./secrets/turn_secret }
+  seed_password: { file: ./secrets/seed_password }
