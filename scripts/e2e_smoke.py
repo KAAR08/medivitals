@@ -37,11 +37,18 @@ WSS = "wss" + BASE[len("https") :]
 HOST, PORT = urlsplit(BASE).hostname, urlsplit(BASE).port or 443
 _dev_ca = ROOT / "secrets" / "dev_ca.crt"
 CA = str(_dev_ca) if HOST == "localhost" and _dev_ca.exists() else None
-PW = (
-    os.environ.get("SEED_PASSWORD")
-    or (ROOT / "secrets" / "seed_password").read_text(encoding="utf-8").strip()
-)
 JOHN, BOB = "7c9e6679-7425-40de-944b-e07fc1f90ae7", "9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d"
+# Each account's own password (scripts/generate_dev_secrets.py; ACCOUNTS_FILE overrides).
+_accounts = json.loads(
+    Path(os.environ.get("ACCOUNTS_FILE", ROOT / "secrets" / "accounts.json")).read_text(encoding="utf-8")
+)
+_first = lambda pred: next(a for a in _accounts if pred(a))  # noqa: E731
+LOGINS = {
+    "doctor": _first(lambda a: a["role"] == "doctor"),
+    "nurse": _first(lambda a: a["role"] == "nurse"),
+    "patient": _first(lambda a: a.get("id") == JOHN),
+    "bob": _first(lambda a: a.get("id") == BOB),
+}
 results: list[tuple[str, bool, str]] = []
 
 
@@ -180,15 +187,10 @@ async def main() -> None:
         check("Server header removed", "server" not in r.headers, r.headers.get("server", ""))
 
         tokens, users = {}, {}
-        for role, email in [
-            ("doctor", "dr.sarah@medvitals.com"),
-            ("nurse", "grace.wanjiru@medvitals.com"),
-            ("patient", "john.doe@example.com"),
-            ("bob", "bob.wilson@example.com"),
-        ]:
+        for role, account in LOGINS.items():
             r = await c.post(
                 "/auth/login",
-                json={"email": email, "password": PW, "role": "patient" if role == "bob" else role},
+                json={"email": account["email"], "password": account["password"], "role": account["role"]},
             )
             ok = r.status_code == 200
             check(f"login {role}", ok, "" if ok else r.text[:120])
@@ -202,11 +204,12 @@ async def main() -> None:
 
         r = await c.post(
             "/auth/login",
-            json={"email": "john.doe@example.com", "password": "wrong-password!!", "role": "patient"},
+            json={"email": LOGINS["patient"]["email"], "password": "wrong-password!!", "role": "patient"},
         )
         check("wrong password -> 401", r.status_code == 401)
         r = await c.post(
-            "/auth/login", json={"email": "john.doe@example.com", "password": PW, "role": "doctor"}
+            "/auth/login",
+            json={"email": LOGINS["patient"]["email"], "password": LOGINS["patient"]["password"], "role": "doctor"},
         )
         check("patient logging in as doctor -> 401", r.status_code == 401)
 

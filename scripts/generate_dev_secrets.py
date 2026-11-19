@@ -11,6 +11,7 @@ accept another.
 
 import argparse
 import base64
+import json
 import os
 import secrets
 import subprocess
@@ -28,8 +29,30 @@ SECRET_FILES = {
     "encryption_key": ("ENGINE_ENCRYPTION_KEY", lambda: base64.b64encode(secrets.token_bytes(32)).decode()),
     "device_api_key": ("DEVICE_API_KEY", lambda: secrets.token_urlsafe(32)),
     "turn_secret": ("TURN_SECRET", lambda: secrets.token_urlsafe(32)),
-    "seed_password": ("SEED_PASSWORD", lambda: secrets.token_urlsafe(12)),
 }
+
+# The ward's accounts, each with its own initial password: edit
+# secrets/accounts.json (names, emails, more staff) before the first
+# `docker compose up`. Seeding creates missing accounts only, so afterwards the
+# password lines can be deleted. Keep the patients' ids: the biometric
+# simulator streams vitals for exactly these.
+ACCOUNTS = [
+    {"name": "Dr. Sarah Mitchell", "email": "dr.sarah@medvitals.com", "role": "doctor",
+     "specialization": "Cardiology", "id": "b3f1c2e4-5d6a-4b7c-8e9f-0a1b2c3d4e5f"},
+    {"name": "Nurse Grace Wanjiru", "email": "grace.wanjiru@medvitals.com", "role": "nurse",
+     "specialization": "Cardiac triage", "id": "c4a2d3f5-6e7b-4c8d-9f0a-1b2c3d4e5f60"},
+    {"name": "John Doe", "email": "john.doe@example.com", "role": "patient",
+     "id": "7c9e6679-7425-40de-944b-e07fc1f90ae7"},  # simulator: stable
+    {"name": "Jane Smith", "email": "jane.smith@example.com", "role": "patient",
+     "id": "2f1a8b3c-9d4e-4f5a-8b6c-7d8e9f0a1b2c"},  # simulator: slowly deteriorating
+    {"name": "Bob Wilson", "email": "bob.wilson@example.com", "role": "patient",
+     "id": "9a8b7c6d-5e4f-4a3b-9c2d-1e0f9a8b7c6d"},  # simulator: acute episodes
+]
+
+
+def accounts_json() -> str:
+    accounts = [{**a, "password": secrets.token_urlsafe(12)} for a in ACCOUNTS]
+    return json.dumps(accounts, indent=2) + "\n"
 
 SETTINGS = """\
 # Non-secret settings for docker-compose (secrets live in secrets/).
@@ -109,13 +132,17 @@ def main() -> None:
     if not (SECRETS / "jwt_private_key.pem").exists():
         write_secret("jwt_private_key.pem", rsa_private_key_pem())
         created.append("jwt_private_key.pem")
+    if not (SECRETS / "accounts.json").exists():
+        write_secret("accounts.json", accounts_json())
+        created.append("accounts.json")
 
     settings = {key: old.get(key, default) for key, default in DEFAULTS.items()}
     if not ENV.exists() or args.migrate:
         ENV.write_text(SETTINGS.format(**settings), encoding="utf-8")
 
     print(f"secrets/: created {', '.join(created) or 'nothing (all present)'}")
-    print("Demo accounts' password: see secrets/seed_password")
+    print("Accounts and their initial passwords: secrets/accounts.json")
+    print("  edit it before the first start; once the accounts exist, remove the password lines")
 
 
 if __name__ == "__main__":

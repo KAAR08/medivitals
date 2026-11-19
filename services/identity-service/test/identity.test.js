@@ -6,7 +6,7 @@ import request from 'supertest';
 
 import { createApp } from '../src/app.js';
 import { loadConfig } from '../src/config.js';
-import { DEMO_USERS, seed } from '../src/seed.js';
+import { DEMO_USERS, parseAccounts, seed, seedAccounts } from '../src/seed.js';
 import { MemoryStore } from '../src/store.js';
 import { KeyRing } from '../src/tokens.js';
 
@@ -231,5 +231,81 @@ describe('configuration', () => {
       delete process.env.IDENTITY_MONGO_URL;
       delete process.env.IDENTITY_MONGO_PASSWORD;
     }
+  });
+});
+
+describe('seed accounts', () => {
+  const account = (over = {}) => ({
+    email: 'nurse.amina@hospital.test',
+    name: 'Nurse Amina',
+    role: 'nurse',
+    password: 'amina-own-password',
+    ...over,
+  });
+
+  it('gives every account its own password', async () => {
+    store = new MemoryStore();
+    const config = loadConfig({ scryptCost: 1024, loginRateLimit: 100 });
+    const accounts = parseAccounts(
+      JSON.stringify([
+        account(),
+        { ...account(), email: 'Dr.Omar@Hospital.test', name: 'Dr. Omar', role: 'doctor', password: 'omar-own-password' },
+      ]),
+    );
+    await seedAccounts(store, accounts, config.scryptCost);
+    app = await createApp({ config, store, keys });
+
+    assert.equal((await login('nurse.amina@hospital.test', 'nurse', 'amina-own-password')).status, 200);
+    assert.equal((await login('dr.omar@hospital.test', 'doctor', 'omar-own-password')).status, 200);
+    assert.equal((await login('dr.omar@hospital.test', 'doctor', 'amina-own-password')).status, 401);
+  });
+
+  it('keeps a given id (patients linked to the simulator) and creates one otherwise', () => {
+    const [kept, created] = parseAccounts(
+      JSON.stringify([account({ id: JOHN.id, role: 'patient' }), account({ email: 'b@x.test' })]),
+    );
+    assert.equal(kept.id, JOHN.id);
+    assert.match(created.id, /^[0-9a-f-]{36}$/);
+  });
+
+  it('rejects a file with short passwords, bad roles or duplicates, naming each problem', () => {
+    const bad = JSON.stringify([account({ password: 'short' }), account({ role: 'admin' })]);
+    assert.throws(() => parseAccounts(bad), (err) => {
+      assert.match(err.message, /password needs 12\+ characters/);
+      assert.match(err.message, /role must be doctor, nurse or patient/);
+      assert.match(err.message, /duplicate email/);
+      return true;
+    });
+    assert.throws(() => parseAccounts('[]'), /non-empty/);
+  });
+
+  it('never changes an existing account, so the passwords can be removed from the file', async () => {
+    store = new MemoryStore();
+    const config = loadConfig({ scryptCost: 1024, loginRateLimit: 100 });
+    const first = await seedAccounts(store, parseAccounts(JSON.stringify([account()])), config.scryptCost);
+    assert.deepEqual(first.created, ['nurse.amina@hospital.test']);
+
+    // Re-run with another password, then with none: the stored hash stays.
+    const changed = parseAccounts(JSON.stringify([account({ password: 'a-different-password' })]));
+    assert.deepEqual((await seedAccounts(store, changed, config.scryptCost)).existing, ['nurse.amina@hospital.test']);
+    const withoutPassword = account();
+    delete withoutPassword.password;
+    const again = await seedAccounts(store, parseAccounts(JSON.stringify([withoutPassword])), config.scryptCost);
+    assert.deepEqual(again.created, []);
+
+    app = await createApp({ config, store, keys });
+    assert.equal((await login('nurse.amina@hospital.test', 'nurse', 'amina-own-password')).status, 200);
+    assert.equal((await login('nurse.amina@hospital.test', 'nurse', 'a-different-password')).status, 401);
+  });
+
+  it('refuses to create a new account without a password', async () => {
+    store = new MemoryStore();
+    const withoutPassword = account();
+    delete withoutPassword.password;
+    await assert.rejects(
+      seedAccounts(store, parseAccounts(JSON.stringify([withoutPassword])), 1024),
+      /new accounts need a password:\n {2}nurse\.amina@hospital\.test/,
+    );
+    assert.equal(await store.findUserByEmail('nurse.amina@hospital.test'), null);
   });
 });

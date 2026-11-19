@@ -56,8 +56,9 @@ services:
     environment:
       IDENTITY_MONGO_URL: mongodb://medvitals@mongo:27017/medvitals_identity?authSource=admin
       IDENTITY_MONGO_PASSWORD_FILE: /run/secrets/mongo_password
-      IDENTITY_SEED_PASSWORD_FILE: /run/secrets/seed_password
-    secrets: [mongo_password, seed_password]
+      # Each account with its own password (secrets/accounts.json).
+      IDENTITY_SEED_ACCOUNTS_FILE: /run/secrets/accounts
+    secrets: [mongo_password, accounts]
     depends_on:
       mongo: { condition: service_healthy }
     networks: [data]
@@ -200,4 +201,4 @@ secrets:
   encryption_key: { file: ./secrets/encryption_key }
   device_api_key: { file: ./secrets/device_api_key }
   turn_secret: { file: ./secrets/turn_secret }
-  seed_password: { file: ./secrets/seed_password }
+  accounts: { file: ./secrets/accounts.json }
