@@ -139,10 +139,14 @@ class SeverityChip extends StatelessWidget {
         children: [
           Icon(s.icon, size: 12, color: s.fg),
           const SizedBox(width: 4),
-          Text(
-            s.label,
-            style: TextStyle(
-                fontSize: 11, fontWeight: FontWeight.w700, color: s.fg),
+          Flexible(
+            child: Text(
+              s.label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                  fontSize: 11, fontWeight: FontWeight.w700, color: s.fg),
+            ),
           ),
         ],
       ),

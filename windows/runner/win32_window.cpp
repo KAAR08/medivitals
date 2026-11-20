@@ -187,6 +187,17 @@ Win32Window::MessageHandler(HWND hwnd,
       }
       return 0;
 
+    case WM_GETMINMAXINFO: {
+      // Smallest window the layout is designed for (phone-sized), DPI-aware.
+      auto info = reinterpret_cast<MINMAXINFO*>(lparam);
+      double scale = FlutterDesktopGetDpiForMonitor(
+                         MonitorFromWindow(hwnd, MONITOR_DEFAULTTONEAREST)) /
+                     96.0;
+      info->ptMinTrackSize.x = Scale(400, scale);
+      info->ptMinTrackSize.y = Scale(640, scale);
+      return 0;
+    }
+
     case WM_DPICHANGED: {
       auto newRectSize = reinterpret_cast<RECT*>(lparam);
       LONG newWidth = newRectSize->right - newRectSize->left;

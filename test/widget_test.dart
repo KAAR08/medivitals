@@ -28,7 +28,24 @@ class SilentAlarmPlayer implements AlarmPlayer {
   Future<void> stop() async {}
 }
 
-Future<void> startApp(WidgetTester tester) async {
+/// These tests describe the phone layout (bottom navigation). The test
+/// screen defaults to 800 px wide, which the app treats as a desktop window.
+void usePhoneScreen(WidgetTester tester) {
+  final view = tester.view;
+  if (view.physicalSize.width / view.devicePixelRatio < 720) return;
+  view.physicalSize = const Size(412, 915);
+  view.devicePixelRatio = 1.0;
+  addTearDown(view.reset);
+}
+
+Future<void> startApp(WidgetTester tester, {bool desktop = false}) async {
+  if (desktop) {
+    tester.view.physicalSize = const Size(1100, 760);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(tester.view.reset);
+  } else {
+    usePhoneScreen(tester);
+  }
   await tester.pumpWidget(ProviderScope(
     overrides: [alarmPlayerProvider.overrideWithValue(SilentAlarmPlayer())],
     child: const MedVitalsLinkApp(),
@@ -105,6 +122,38 @@ void main() {
         scrollable: find.byType(Scrollable).last);
     await tapAndWait(tester, find.text('Logout'), const Duration(seconds: 2));
 
+    expect(find.text('Sign In'), findsOneWidget);
+    await stopApp(tester);
+  });
+
+  testWidgets('wide window: side rail navigation, readable-width content',
+      (tester) async {
+    await startApp(tester, desktop: true);
+
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Email address'), 'dr@example.com');
+    await tester.enterText(
+        find.widgetWithText(TextFormField, 'Password'), 'secret1');
+    await tapAndWait(tester, find.text('Doctor'));
+    await tapAndWait(tester, find.text('Sign In'), const Duration(seconds: 2));
+
+    expect(find.byType(NavigationRail), findsOneWidget);
+    expect(find.byType(NavigationBar), findsNothing);
+    expect(find.text('Jane Smith'), findsOneWidget);
+
+    await tapAndWait(
+        tester,
+        find.descendant(
+            of: find.byType(NavigationRail), matching: find.text('Account')),
+        const Duration(seconds: 1));
+    expect(tester.getSize(find.text('Logout')).width, lessThan(720));
+    final logout = tester.getRect(find
+        .ancestor(of: find.text('Logout'), matching: find.byType(Container))
+        .first);
+    expect(logout.width, lessThanOrEqualTo(720),
+        reason: 'content keeps a readable width on a wide window');
+
+    await tapAndWait(tester, find.text('Logout'), const Duration(seconds: 2));
     expect(find.text('Sign In'), findsOneWidget);
     await stopApp(tester);
   });
@@ -188,7 +237,7 @@ void main() {
       (tester) async {
     // Tall enough for every case card: Jane's simulated decline follows the
     // clock, so on some runs her case is in the queue above John's.
-    tester.view.physicalSize = const Size(800, 1800);
+    tester.view.physicalSize = const Size(412, 1800);
     tester.view.devicePixelRatio = 1.0;
     addTearDown(tester.view.reset);
     FlutterSecureStorage.setMockInitialValues({

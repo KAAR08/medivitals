@@ -8,6 +8,7 @@ import '../../../../core/network/api_client.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../data/models/conversation_model.dart';
 import '../viewmodels/chat_viewmodel.dart';
+import '../../../../core/layout/responsive.dart';
 
 /// The signed-in user's conversations (`/chat`).
 class ConversationsView extends ConsumerWidget {
@@ -21,7 +22,8 @@ class ConversationsView extends ConsumerWidget {
     return Scaffold(
       backgroundColor: c.background,
       appBar: AppBar(title: const Text('Messages')),
-      body: RefreshIndicator(
+      body: ReadableWidth(
+          child: RefreshIndicator(
         color: c.brand,
         onRefresh: () => ref.refresh(conversationsProvider.future),
         child: conversations.when(
@@ -47,7 +49,7 @@ class ConversationsView extends ConsumerWidget {
                       _ConversationTile(conversation: list[i]),
                 ),
         ),
-      ),
+      )),
     );
   }
 }
