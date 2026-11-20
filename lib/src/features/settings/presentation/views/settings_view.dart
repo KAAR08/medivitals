@@ -6,6 +6,7 @@ import '../../../../core/navigation/app_routes.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/viewmodels/auth_viewmodel.dart';
 import '../viewmodels/settings_viewmodel.dart';
+import '../../../../core/layout/responsive.dart';
 
 /// Profile, appearance, about, privacy notice and sign-out.
 class SettingsView extends ConsumerWidget {
@@ -22,10 +23,10 @@ class SettingsView extends ConsumerWidget {
         title: const Text('Account'),
         elevation: 0,
       ),
-      body: ListView(
+      body: ReadableWidth(
+          child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // Account Section
           const _SectionHeader(label: 'Account'),
           const SizedBox(height: 8),
           _SettingsTile(
@@ -36,7 +37,6 @@ class SettingsView extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
 
-          // App Section
           const _SectionHeader(label: 'App Settings'),
           const SizedBox(height: 8),
           Padding(
@@ -73,7 +73,6 @@ class SettingsView extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
 
-          // About Section
           const _SectionHeader(label: 'About'),
           const SizedBox(height: 8),
           _SettingsTile(
@@ -96,15 +95,12 @@ class SettingsView extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
 
-          // Logout Button
-          const _SectionHeader(label: 'Session'),
-          const SizedBox(height: 8),
           // The router redirects to login as soon as the auth state changes.
           _LogoutButton(
               onPressed: () =>
                   ref.read(authViewModelProvider.notifier).logout()),
         ],
-      ),
+      )),
     );
   }
 }

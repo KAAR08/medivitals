@@ -219,6 +219,19 @@ abstract final class AppTheme {
                   : c.textTertiary,
             )),
       ),
+      // The bottom bar's look, for the side rail used on wide screens.
+      navigationRailTheme: NavigationRailThemeData(
+        backgroundColor: c.surface,
+        elevation: 0,
+        indicatorColor: isDark ? c.brand.fade(0.35) : c.brandLight,
+        selectedIconTheme:
+            IconThemeData(size: 24, color: isDark ? c.textPrimary : c.brand),
+        unselectedIconTheme: IconThemeData(size: 24, color: c.textTertiary),
+        selectedLabelTextStyle: _inter(
+            fontSize: 12, fontWeight: FontWeight.w600, color: c.textPrimary),
+        unselectedLabelTextStyle: _inter(
+            fontSize: 12, fontWeight: FontWeight.w500, color: c.textTertiary),
+      ),
       dividerTheme: DividerThemeData(color: c.divider, thickness: 1, space: 1),
       chipTheme: ChipThemeData(
         backgroundColor: c.surfaceElevated,

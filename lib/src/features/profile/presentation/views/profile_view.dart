@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/viewmodels/auth_viewmodel.dart';
 import '../../../auth/data/models/user_model.dart';
+import '../../../../core/layout/responsive.dart';
 
 /// Read-only: account details belong to the identity service.
 class ProfileView extends ConsumerWidget {
@@ -22,7 +23,8 @@ class ProfileView extends ConsumerWidget {
         title: const Text('Profile'),
         elevation: 0,
       ),
-      body: SingleChildScrollView(
+      body: ReadableWidth(
+          child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -92,7 +94,7 @@ class ProfileView extends ConsumerWidget {
             const SizedBox(height: 32),
           ],
         ),
-      ),
+      )),
     );
   }
 }

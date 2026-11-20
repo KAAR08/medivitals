@@ -14,6 +14,7 @@ import '../../../auth/presentation/viewmodels/auth_viewmodel.dart';
 import '../../data/models/escalation_model.dart';
 import '../viewmodels/escalation_viewmodel.dart';
 import 'case_outcome_form.dart';
+import '../../../../core/layout/responsive.dart';
 
 /// Every open case, most urgent first. Nurses land here; doctors open it
 /// from their monitor for the cases referred to them.
@@ -35,7 +36,8 @@ class TriageQueueView extends ConsumerWidget {
             : 'Triage queue'),
         // Doctors reach this screen from their monitor; the nurse lands here.
       ),
-      body: Column(
+      body: ReadableWidth(
+          child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Container(
@@ -80,7 +82,7 @@ class TriageQueueView extends ConsumerWidget {
             ),
           ),
         ],
-      ),
+      )),
     );
   }
 }

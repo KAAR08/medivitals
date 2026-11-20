@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../auth/presentation/viewmodels/auth_viewmodel.dart';
 import '../../data/models/chat_message_model.dart';
 import '../viewmodels/chat_viewmodel.dart';
+import '../../../../core/layout/responsive.dart';
 
 class ChatRoomView extends ConsumerStatefulWidget {
   const ChatRoomView({super.key, required this.conversationId});
@@ -118,7 +119,8 @@ class _ChatRoomViewState extends ConsumerState<ChatRoomView> {
           ),
         ],
       ),
-      body: Column(
+      body: ReadableWidth(
+          child: Column(
         children: [
           Expanded(
             child: chatState.isLoading
@@ -144,7 +146,7 @@ class _ChatRoomViewState extends ConsumerState<ChatRoomView> {
             onSend: () => _send(currentUserId),
           ),
         ],
-      ),
+      )),
     );
   }
 }

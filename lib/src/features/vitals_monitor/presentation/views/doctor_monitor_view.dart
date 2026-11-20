@@ -9,6 +9,7 @@ import '../../data/models/vitals_model.dart';
 import '../../domain/triage.dart';
 import '../viewmodels/vitals_viewmodel.dart';
 import '../widgets/health_banner.dart';
+import '../../../../core/layout/responsive.dart';
 
 class DoctorMonitorView extends ConsumerWidget {
   const DoctorMonitorView({super.key});
@@ -24,36 +25,39 @@ class DoctorMonitorView extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Patients'),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SummaryBar(
-            activeCount: patients.where((p) => p.isConnected).length,
-            anomalyCount: anomalyCount,
-            isConnected: monitorState.isConnected,
-          ),
-          Expanded(
-            child: patients.isEmpty
-                ? const _EmptyState()
-                : GridView.builder(
-                    padding: const EdgeInsets.all(16),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      crossAxisSpacing: 12,
-                      mainAxisSpacing: 12,
-                      childAspectRatio: 1.05,
-                    ),
-                    itemCount: patients.length,
-                    itemBuilder: (_, i) => _PatientCard(
-                      patientState: patients[i],
-                      onTap: () => context.push(
-                          AppRoutes.patientDetailPath(patients[i].patientId)),
-                    ),
-                  ),
-          ),
-        ],
-      ),
+      body: ReadableWidth(
+          maxWidth: 1200,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SummaryBar(
+                activeCount: patients.where((p) => p.isConnected).length,
+                anomalyCount: anomalyCount,
+                isConnected: monitorState.isConnected,
+              ),
+              Expanded(
+                child: patients.isEmpty
+                    ? const _EmptyState()
+                    : GridView.builder(
+                        padding: const EdgeInsets.all(16),
+                        // Two columns on a phone, more as the window widens.
+                        gridDelegate:
+                            const SliverGridDelegateWithMaxCrossAxisExtent(
+                          maxCrossAxisExtent: 260,
+                          crossAxisSpacing: 12,
+                          mainAxisSpacing: 12,
+                          mainAxisExtent: 184,
+                        ),
+                        itemCount: patients.length,
+                        itemBuilder: (_, i) => _PatientCard(
+                          patientState: patients[i],
+                          onTap: () => context.push(AppRoutes.patientDetailPath(
+                              patients[i].patientId)),
+                        ),
+                      ),
+              ),
+            ],
+          )),
     );
   }
 }
@@ -118,16 +122,19 @@ class _SummaryBar extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          Text(
-            isConnected
-                ? 'Live · $activeCount patients'
-                : 'Connecting to stream…',
-            style: Theme.of(context)
-                .textTheme
-                .bodySmall
-                ?.copyWith(fontWeight: FontWeight.w500),
+          Expanded(
+            child: Text(
+              isConnected
+                  ? 'Live · $activeCount patients'
+                  : 'Connecting to stream…',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(fontWeight: FontWeight.w500),
+            ),
           ),
-          const Spacer(),
           if (anomalyCount > 0) _AnomalyBadge(count: anomalyCount),
         ],
       ),

@@ -6,6 +6,7 @@ import '../../features/auth/data/models/user_model.dart';
 import '../../features/auth/presentation/viewmodels/auth_viewmodel.dart';
 import '../../features/escalation/presentation/viewmodels/escalation_viewmodel.dart';
 import '../config/app_config.dart';
+import '../layout/responsive.dart';
 import '../theme/app_colors.dart';
 
 /// The shell's branches, in the order they're declared in the router.
@@ -21,7 +22,7 @@ class _Destination {
   final int badge;
 }
 
-/// Bottom navigation, with tabs per role:
+/// Bottom navigation on phones, a side rail on wide windows; tabs per role:
 ///   patient  Home · Messages · Account
 ///   nurse    Queue · Patients · Messages · Account
 ///   doctor   Patients · Cases · Messages · Account
@@ -63,31 +64,61 @@ class AppShell extends ConsumerWidget {
 
     final selected = destinations
         .indexWhere((d) => d.tab.index == navigationShell.currentIndex);
+    final selectedIndex = selected < 0 ? 0 : selected;
+    void onSelected(int i) {
+      final branch = destinations[i].tab.index;
+      // Tapping the current tab again returns to its first screen.
+      navigationShell.goBranch(branch,
+          initialLocation: branch == navigationShell.currentIndex);
+    }
+
+    Widget icon(_Destination d, IconData data) => Badge(
+        isLabelVisible: d.badge > 0,
+        label: Text('${d.badge}'),
+        child: Icon(data));
+
+    if (context.isWide) {
+      return Scaffold(
+        body: Row(
+          children: [
+            SafeArea(
+              right: false,
+              child: NavigationRail(
+                selectedIndex: selectedIndex,
+                onDestinationSelected: onSelected,
+                labelType: NavigationRailLabelType.all,
+                groupAlignment: -0.9,
+                destinations: [
+                  for (final d in destinations)
+                    NavigationRailDestination(
+                      label: Text(d.label),
+                      icon: icon(d, d.icon),
+                      selectedIcon: icon(d, d.selectedIcon),
+                    ),
+                ],
+              ),
+            ),
+            VerticalDivider(width: 1, color: context.colors.divider),
+            Expanded(child: navigationShell),
+          ],
+        ),
+      );
+    }
+
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: DecoratedBox(
         decoration: BoxDecoration(
             border: Border(top: BorderSide(color: context.colors.divider))),
         child: NavigationBar(
-          selectedIndex: selected < 0 ? 0 : selected,
-          onDestinationSelected: (i) {
-            final branch = destinations[i].tab.index;
-            // Tapping the current tab again returns to its first screen.
-            navigationShell.goBranch(branch,
-                initialLocation: branch == navigationShell.currentIndex);
-          },
+          selectedIndex: selectedIndex,
+          onDestinationSelected: onSelected,
           destinations: [
             for (final d in destinations)
               NavigationDestination(
                 label: d.label,
-                icon: Badge(
-                    isLabelVisible: d.badge > 0,
-                    label: Text('${d.badge}'),
-                    child: Icon(d.icon)),
-                selectedIcon: Badge(
-                    isLabelVisible: d.badge > 0,
-                    label: Text('${d.badge}'),
-                    child: Icon(d.selectedIcon)),
+                icon: icon(d, d.icon),
+                selectedIcon: icon(d, d.selectedIcon),
               ),
           ],
         ),

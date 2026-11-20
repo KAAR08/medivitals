@@ -17,6 +17,7 @@ import '../../data/repositories/vitals_repository.dart';
 import '../../domain/triage.dart';
 import '../viewmodels/vitals_viewmodel.dart';
 import '../widgets/health_banner.dart';
+import '../../../../core/layout/responsive.dart';
 
 /// Live vitals for one patient: the signed-in patient (`patientId` null), or
 /// the patient at `/patients/:id` for the care team.
@@ -58,7 +59,8 @@ class PatientDashboardView extends ConsumerWidget {
           ],
         ],
       ),
-      body: RefreshIndicator(
+      body: ReadableWidth(
+          child: RefreshIndicator(
         color: c.brand,
         onRefresh: () =>
             ref.read(vitalsViewModelProvider(id).notifier).refresh(),
@@ -163,7 +165,7 @@ class PatientDashboardView extends ConsumerWidget {
             ),
           ],
         ),
-      ),
+      )),
     );
   }
 
