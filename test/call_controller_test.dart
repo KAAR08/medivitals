@@ -104,7 +104,7 @@ class FakeMedia implements CallMedia {
   Widget localView() => const SizedBox();
 
   @override
-  Widget remoteView() => const SizedBox();
+  Widget remoteView({required bool fill}) => const SizedBox();
 
   @override
   Future<void> close() async => closed = true;
