@@ -46,7 +46,11 @@ abstract interface class CallMedia {
   bool get hasSpeakerToggle;
 
   Widget localView();
-  Widget remoteView();
+
+  /// The other side's video. [fill] crops it to fill the area (a portrait
+  /// phone screen); otherwise the whole picture is shown (a wide window, where
+  /// filling would crop a portrait phone camera to a close-up).
+  Widget remoteView({required bool fill});
 
   Future<void> close();
 }
@@ -304,9 +308,11 @@ class WebRtcCallMedia implements CallMedia {
       );
 
   @override
-  Widget remoteView() => RTCVideoView(
+  Widget remoteView({required bool fill}) => RTCVideoView(
         _remoteRenderer,
-        objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+        objectFit: fill
+            ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
+            : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
       );
 
   @override

@@ -88,7 +88,12 @@ class _CallScreenState extends ConsumerState<CallScreen> {
         children: [
           Positioned.fill(
             child: showRemoteVideo
-                ? media.remoteView()
+                ? ColoredBox(
+                    color: Colors.black,
+                    child: media.remoteView(
+                        fill: MediaQuery.orientationOf(context) ==
+                            Orientation.portrait),
+                  )
                 : const DecoratedBox(
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
