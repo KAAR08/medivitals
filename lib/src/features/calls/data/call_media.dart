@@ -52,10 +52,41 @@ abstract interface class CallMedia {
   /// filling would crop a portrait phone camera to a close-up).
   Widget remoteView({required bool fill});
 
+  /// What the connection is actually delivering right now (from WebRTC's own
+  /// statistics), or null before the call connects.
+  Future<CallQuality?> quality();
+
   Future<void> close();
 }
 
 enum MediaConnection { connecting, connected, interrupted, failed }
+
+/// A snapshot of the call's media, for the call screen's quality line.
+class CallQuality {
+  const CallQuality({
+    this.receivedWidth,
+    this.receivedHeight,
+    this.receivedFps,
+    this.sentWidth,
+    this.sentHeight,
+    this.limitedBy,
+    this.relayed,
+  });
+
+  /// The other side's video as it arrives here.
+  final int? receivedWidth, receivedHeight;
+  final double? receivedFps;
+
+  /// Our video as we send it.
+  final int? sentWidth, sentHeight;
+
+  /// Why WebRTC is sending below the camera's resolution: 'bandwidth' or
+  /// 'cpu' (null when it isn't limited).
+  final String? limitedBy;
+
+  /// True when media goes through the TURN relay rather than directly.
+  final bool? relayed;
+}
 
 class CallMediaException implements Exception {
   const CallMediaException(this.message);
@@ -314,6 +345,50 @@ class WebRtcCallMedia implements CallMedia {
             ? RTCVideoViewObjectFit.RTCVideoViewObjectFitCover
             : RTCVideoViewObjectFit.RTCVideoViewObjectFitContain,
       );
+
+  @override
+  Future<CallQuality?> quality() async {
+    final pc = _pc;
+    if (pc == null || _closed) return null;
+    final reports = await pc.getStats();
+    final byId = {for (final r in reports) r.id: r};
+    int? asInt(Object? v) => v is num ? v.toInt() : null;
+
+    int? inW, inH, outW, outH;
+    double? inFps;
+    String? limitedBy;
+    bool? relayed;
+    for (final r in reports) {
+      final v = r.values;
+      final video = v['kind'] == 'video' || v['mediaType'] == 'video';
+      if (r.type == 'inbound-rtp' && video) {
+        inW = asInt(v['frameWidth']) ?? inW;
+        inH = asInt(v['frameHeight']) ?? inH;
+        final fps = v['framesPerSecond'];
+        if (fps is num) inFps = fps.toDouble();
+      } else if (r.type == 'outbound-rtp' && video) {
+        outW = asInt(v['frameWidth']) ?? outW;
+        outH = asInt(v['frameHeight']) ?? outH;
+        final reason = v['qualityLimitationReason'];
+        if (reason is String && reason != 'none') limitedBy = reason;
+      } else if (r.type == 'candidate-pair' &&
+          v['state'] == 'succeeded' &&
+          (v['nominated'] == true || v['selected'] == true)) {
+        final local = byId[v['localCandidateId']]?.values['candidateType'];
+        final remote = byId[v['remoteCandidateId']]?.values['candidateType'];
+        relayed = local == 'relay' || remote == 'relay';
+      }
+    }
+    return CallQuality(
+      receivedWidth: inW,
+      receivedHeight: inH,
+      receivedFps: inFps,
+      sentWidth: outW,
+      sentHeight: outH,
+      limitedBy: limitedBy,
+      relayed: relayed,
+    );
+  }
 
   @override
   Future<void> close() async {

@@ -9,6 +9,7 @@ import '../../../auth/data/models/user_model.dart';
 import '../../../auth/presentation/viewmodels/auth_viewmodel.dart';
 import '../../../escalation/presentation/views/case_outcome_form.dart';
 import '../../../vitals_monitor/presentation/viewmodels/vitals_viewmodel.dart';
+import '../../data/call_media.dart';
 import '../../data/models/call_models.dart';
 import '../viewmodels/call_controller.dart';
 
@@ -110,7 +111,7 @@ class _CallScreenState extends ConsumerState<CallScreen> {
           SafeArea(
             child: Column(
               children: [
-                _TopBar(call: call),
+                _TopBar(call: call, media: media),
                 if (isCareTeam && call.isLive)
                   _LiveVitalsStrip(patientId: call.patientId),
                 Expanded(
@@ -174,8 +175,9 @@ abstract final class _CallColors {
 }
 
 class _TopBar extends StatelessWidget {
-  const _TopBar({required this.call});
+  const _TopBar({required this.call, required this.media});
   final CallState call;
+  final CallMedia? media;
 
   @override
   Widget build(BuildContext context) {
@@ -195,8 +197,68 @@ class _TopBar extends StatelessWidget {
                   const TextStyle(fontSize: 12, color: _CallColors.textMuted),
             ),
           ),
+          if (media != null &&
+              !call.simulated &&
+              call.phase == CallPhase.active &&
+              (call.localVideo || call.remoteVideo))
+            _QualityLabel(media: media!),
         ],
       ),
+    );
+  }
+}
+
+/// What the video connection is really delivering, from WebRTC's statistics:
+/// resolution and frame rate, the route, and why quality is being reduced.
+class _QualityLabel extends StatefulWidget {
+  const _QualityLabel({required this.media});
+  final CallMedia media;
+
+  @override
+  State<_QualityLabel> createState() => _QualityLabelState();
+}
+
+class _QualityLabelState extends State<_QualityLabel> {
+  Timer? _timer;
+  CallQuality? _quality;
+
+  @override
+  void initState() {
+    super.initState();
+    _refresh();
+    _timer = Timer.periodic(const Duration(seconds: 2), (_) => _refresh());
+  }
+
+  Future<void> _refresh() async {
+    try {
+      final q = await widget.media.quality();
+      if (mounted) setState(() => _quality = q);
+    } catch (_) {
+      // Statistics are best effort; the call itself is unaffected.
+    }
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final q = _quality;
+    if (q == null) return const SizedBox.shrink();
+    final parts = <String>[
+      if (q.receivedHeight != null)
+        '${q.receivedWidth}×${q.receivedHeight}'
+            '${q.receivedFps != null ? ' · ${q.receivedFps!.round()} fps' : ''}',
+      if (q.relayed != null) q.relayed! ? 'relayed' : 'direct',
+      if (q.limitedBy != null) 'sending limited by ${q.limitedBy}',
+    ];
+    if (parts.isEmpty) return const SizedBox.shrink();
+    return Text(
+      parts.join(' · '),
+      style: const TextStyle(fontSize: 12, color: _CallColors.textMuted),
     );
   }
 }
